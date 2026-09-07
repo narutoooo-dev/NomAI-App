@@ -1,0 +1,51 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Flutter (FVM)
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.0' # Based on the .fvmrc file
+        channel: 'stable'
+        cache: true
+
+    - name: Enable FVM
+      run: dart pub global activate fvm
+
+    - name: Install dependencies
+      run: |
+        fvm flutter pub get
+
+    - name: Create Firebase config file
+      env:
+        FIREBASE_CONFIG: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      run: echo "$FIREBASE_CONFIG" > android/app/google-services.json
+
+    - name: Create .env file (if needed)
+      run: |
+        echo "BASE_URL=${{ secrets.BASE_URL }}" > .env
+
+    - name: Run unit tests
+      run: |
+        fvm flutter test
+
+    - name: Build Android APK
+      run: |
+        fvm flutter build apk --release --split-per-abi
+
+    - name: Upload APK artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-release-apks
+        path: build/app/outputs/flutter-apk/*.apk
